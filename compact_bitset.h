@@ -118,7 +118,7 @@ public:
         for (auto i = pos; i < n && j < N; ++i, ++j) {
             const auto ch = str[i];
             if (Traits::eq(ch, one)) (*this)[j] = true;
-            else if (Traits::eq(ch, zero)) (*this)[j] = false;
+            else if (Traits::eq(ch, zero)) { /* elided -- dest. value already 0 */ }
             else throw std::invalid_argument("Encountered a character in the string that is not 'one' or 'zero'");
         }
     }
