@@ -203,7 +203,7 @@ public:
         compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < Np; ++i)
             ret[i] = lhs[i] & rhs[i];
-        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask;
+        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     template<std::size_t Np, typename Tp>
@@ -211,7 +211,7 @@ public:
         compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < Np; ++i)
             ret[i] = lhs[i] | rhs[i];
-        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask;
+        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     template<std::size_t Np, typename Tp>
@@ -219,7 +219,7 @@ public:
         compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < Np; ++i)
             ret[i] = lhs[i] ^ rhs[i];
-        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask;
+        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     compact_bitset & operator&=(const compact_bitset & rhs) noexcept { return *this = *this & rhs; }
@@ -234,7 +234,7 @@ public:
             ret[i] = false;
         for (std::size_t i = 0; i + shift < N; ++i)
             ret[i + shift] = (*this)[i];
-        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask;
+        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     compact_bitset& operator<<=(std::size_t shift) noexcept { return *this = (*this) << shift; }
@@ -246,7 +246,7 @@ public:
             ret[i] = false;
         for (std::size_t i = 0; i < endpos; ++i)
             ret[i] = (*this)[i + shift];
-        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask;
+        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     compact_bitset& operator>>=(std::size_t shift) noexcept { return *this = (*this) >> shift; }
@@ -256,6 +256,13 @@ public:
 
     /// std::hash support
     std::size_t hash_code() const noexcept;
+
+    /// access to the underlying data. Note that bits in this array that are unused are guaranteed
+    /// to be 0
+    const std::byte *bits() const noexcept { return reinterpret_cast<const std::byte *>(data.data()); }
+    std::byte *bits() noexcept { return reinterpret_cast<std::byte *>(data.data()); }
+    /// returns the number of bytes in the .bits() array
+    std::size_t bits_size() const noexcept { return data.size() * sizeof(T); }
 };
 
 template <std::size_t N, typename T>
