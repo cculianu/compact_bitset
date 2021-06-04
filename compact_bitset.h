@@ -27,7 +27,6 @@
 #include <array>
 #include <cstddef> // for std::byte
 #include <cstdint>
-#include <cstring> // for std::memcpy
 #include <functional>
 #include <istream>
 #include <locale>
