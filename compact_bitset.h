@@ -27,6 +27,7 @@
 #include <array>
 #include <cstddef> // for std::byte
 #include <cstdint>
+#include <cstring> // for std::memcpy
 #include <functional>
 #include <istream>
 #include <locale>
@@ -76,11 +77,11 @@ public:
 private:
     constexpr reference make_ref(std::size_t i) noexcept { return reference(data[i / TBits], i % TBits); }
     constexpr const reference make_ref(std::size_t i) const noexcept { return const_cast<compact_bitset &>(*this).make_ref(i); }
-    void throwIfOutOfRange(std::size_t pos) const {
+    void throw_if_out_of_range(std::size_t pos) const {
         if (pos >= size()) throw std::out_of_range("Out-of-range bit position specified to compact_bitset");
     }
     template <typename Int>
-    Int doIntConvert() const noexcept {
+    Int do_int_convert() const noexcept {
         if constexpr (N == 0) return 0;
         Int ret{};
         constexpr std::size_t IntBytes = sizeof(ret);
@@ -140,7 +141,7 @@ public:
     constexpr bool operator[](std::size_t pos) const noexcept { return make_ref(pos); }
     static constexpr std::size_t size() noexcept { return N; }
 
-    bool test(std::size_t pos) const { throwIfOutOfRange(pos); return (*this)[pos]; }
+    bool test(std::size_t pos) const { throw_if_out_of_range(pos); return (*this)[pos]; }
 
     /// returns the number of bits set to true
     std::size_t count() const noexcept;
@@ -154,17 +155,17 @@ public:
     /// set all bits to true
     compact_bitset & set() noexcept;
     /// set a specific bit -- throws std::out_of_range if pos >= size()
-    compact_bitset & set(std::size_t pos, bool value = true) { throwIfOutOfRange(pos); (*this)[pos] = value; return *this; }
+    compact_bitset & set(std::size_t pos, bool value = true) { throw_if_out_of_range(pos); (*this)[pos] = value; return *this; }
 
     /// sets all bits to false
     compact_bitset & reset() noexcept { return *this = compact_bitset(); }
     /// sets the bit at position pos to false
-    compact_bitset & reset(std::size_t pos) { throwIfOutOfRange(pos); (*this)[pos] = false; return *this; }
+    compact_bitset & reset(std::size_t pos) { throw_if_out_of_range(pos); (*this)[pos] = false; return *this; }
 
     /// flips all bits (like operator~, but in-place)
     compact_bitset & flip() noexcept;
     /// flips the bit at position pos -- throws std::out_of_range if pos >= size()
-    compact_bitset & flip(std::size_t pos) { throwIfOutOfRange(pos); (*this)[pos].flip(); return *this; }
+    compact_bitset & flip(std::size_t pos) { throw_if_out_of_range(pos); (*this)[pos].flip(); return *this; }
 
     /// returns a string representation of the bitset e.g. "00101001101", etc
     template<class CharT = char, class Traits = std::char_traits<CharT>, class Allocator = std::allocator<CharT>>
@@ -185,14 +186,14 @@ public:
         if constexpr (constexpr std::size_t LBits = sizeof(unsigned long) * 8; size() > LBits)
             throw std::overflow_error("This compact_bitset cannot be represented by an unsigned long");
         else
-            return doIntConvert<unsigned long>();
+            return do_int_convert<unsigned long>();
     }
     /// Identical to above but returns an unsigned long long.
     unsigned long long to_ullong() const {
         if constexpr (constexpr std::size_t LLBits = sizeof(unsigned long long) * 8; size() > LLBits)
             throw std::overflow_error("This compact_bitset cannot be represented by an unsigned long long");
         else
-            return doIntConvert<unsigned long long>();
+            return do_int_convert<unsigned long long>();
     }
 
 
@@ -202,6 +203,7 @@ public:
         compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < Np; ++i)
             ret[i] = lhs[i] & rhs[i];
+        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask;
         return ret;
     }
     template<std::size_t Np, typename Tp>
@@ -209,6 +211,7 @@ public:
         compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < Np; ++i)
             ret[i] = lhs[i] | rhs[i];
+        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask;
         return ret;
     }
     template<std::size_t Np, typename Tp>
@@ -216,17 +219,13 @@ public:
         compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < Np; ++i)
             ret[i] = lhs[i] ^ rhs[i];
+        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask;
         return ret;
     }
     compact_bitset & operator&=(const compact_bitset & rhs) noexcept { return *this = *this & rhs; }
     compact_bitset & operator|=(const compact_bitset & rhs) noexcept { return *this = *this | rhs; }
     compact_bitset & operator^=(const compact_bitset & rhs) noexcept { return *this = *this ^ rhs; }
-    constexpr compact_bitset operator~() const noexcept {
-        compact_bitset ret{Uninitialized};
-        for (std::size_t i = 0; i < N; ++i)
-            ret[i] = !(*this)[i];
-        return ret;
-    }
+    compact_bitset operator~() const noexcept { return compact_bitset{*this}.flip(); }
 
     // -- bitshift operators
     compact_bitset operator<<(std::size_t shift) const noexcept {
@@ -235,6 +234,7 @@ public:
             ret[i] = false;
         for (std::size_t i = 0; i + shift < N; ++i)
             ret[i + shift] = (*this)[i];
+        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask;
         return ret;
     }
     compact_bitset& operator<<=(std::size_t shift) noexcept { return *this = (*this) << shift; }
@@ -246,15 +246,20 @@ public:
             ret[i] = false;
         for (std::size_t i = 0; i < endpos; ++i)
             ret[i] = (*this)[i + shift];
+        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask;
         return ret;
     }
     compact_bitset& operator>>=(std::size_t shift) noexcept { return *this = (*this) >> shift; }
 
     bool operator==(const compact_bitset &o) const noexcept;
     bool operator!=(const compact_bitset &o) const noexcept { return !(*this == o); }
+
+    /// std::hash support
+    std::size_t hash_code() const noexcept;
 };
 
 template <std::size_t N, typename T>
+inline
 std::size_t compact_bitset<N, T>::count() const noexcept {
     std::size_t ret{};
     // TODO: optimize this to perhaps use intrinsics on some platforms -- this may be slow on some compilers that
@@ -264,6 +269,7 @@ std::size_t compact_bitset<N, T>::count() const noexcept {
 }
 
 template <std::size_t N, typename T>
+inline
 bool compact_bitset<N, T>::all() const noexcept {
     // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
@@ -278,6 +284,7 @@ bool compact_bitset<N, T>::all() const noexcept {
 }
 
 template <std::size_t N, typename T>
+inline
 bool compact_bitset<N, T>::operator==(const compact_bitset &o) const noexcept {
     // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
@@ -292,6 +299,7 @@ bool compact_bitset<N, T>::operator==(const compact_bitset &o) const noexcept {
 }
 
 template <std::size_t N, typename T>
+inline
 bool compact_bitset<N, T>::any() const noexcept {
     // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
@@ -306,6 +314,7 @@ bool compact_bitset<N, T>::any() const noexcept {
 }
 
 template <std::size_t N, typename T>
+inline
 auto compact_bitset<N, T>::set() noexcept -> compact_bitset & {
     // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
@@ -320,6 +329,7 @@ auto compact_bitset<N, T>::set() noexcept -> compact_bitset & {
 }
 
 template <std::size_t N, typename T>
+inline
 auto compact_bitset<N, T>::flip() noexcept -> compact_bitset & {
     // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
@@ -336,6 +346,7 @@ auto compact_bitset<N, T>::flip() noexcept -> compact_bitset & {
 
 /// std::ostream << write support
 template <class CharT, class Traits, std::size_t N, typename T>
+inline
 std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits> & os, const compact_bitset<N, T> & x) {
     const CharT zero = os.widen('0'), one = os.widen('1');
     return os << x.template to_string<CharT, Traits>(zero, one);
@@ -344,6 +355,7 @@ std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits> 
 /// std::istream >> read support. Works exactly like std::bitset.
 /// See docs for std::bitset: https://en.cppreference.com/w/cpp/utility/bitset/operator_ltltgtgt2
 template <class CharT, class Traits, std::size_t N, typename T>
+inline
 std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits> & is, compact_bitset<N, T> & x) {
     const CharT one = is.widen('1'), zero = is.widen('0');
     std::size_t i = 0, ok = 0;
@@ -363,19 +375,22 @@ std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits> 
     return is;
 }
 
+template<std::size_t N, typename T>
+inline
+std::size_t compact_bitset<N, T>::hash_code() const noexcept {
+    std::size_t ret{};
+    const std::byte * const beg = reinterpret_cast<const std::byte *>(data.data());
+    const std::byte * const end = beg + data.size() * sizeof(T);
+    for (const std::byte *cur = beg; cur < end; cur += sizeof(std::size_t)) {
+        std::size_t tmp{};
+        std::memcpy(reinterpret_cast<std::byte *>(&tmp), cur, std::min<std::size_t>(end - cur, sizeof(tmp)));
+        ret ^= tmp;
+    }
+    return ret;
+}
+
 /// specialization for std::hash
 template <std::size_t N, typename T>
 struct std::hash<compact_bitset<N, T>> {
-    std::size_t operator()(const compact_bitset<N, T> & x) const {
-        if constexpr (N <= sizeof(unsigned long))
-            return x.to_ulong();
-        else if constexpr (N <= sizeof(unsigned long long))
-            return x.to_ullong();
-        else
-            // otherwise rely on stringifying this and then returning the hash of that
-            // TODO: optimize this -- this may be slower than we want.
-            return std::hash<std::string>{}(x.to_string());
-    }
+    std::size_t operator()(const compact_bitset<N, T> & x) const noexcept { return x.hash_code(); }
 };
-
-#include <bitset>

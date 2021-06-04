@@ -28,10 +28,10 @@ void test()
     std::cout << cbs << "\n";
     std::cout << cbs2 << "\n";
     std::cout << (cbs == cbs2) << "\n";
+    std::cout << cbs << ", hash_code: " << cbs.hash_code() << "\n";
+    std::cout << cbs2 << ", hash_code: " << cbs2.hash_code() << "\n";
     if (N) cbs2[0] = true;
     if (N) cbs2[cbs2.size()-1] = true;
-    std::cout << cbs << "\n";
-    std::cout << cbs2 << "\n";
     std::cout << (cbs == cbs2) << "\n";
     std::cout << ~cbs << " (~) \n";
     std::cout << (cbs << 2) << " (<< 2)\n";
