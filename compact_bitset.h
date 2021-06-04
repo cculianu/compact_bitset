@@ -73,6 +73,36 @@ private:
 public:
     // default-construct: all bits are 0
     constexpr compact_bitset() noexcept : data{{T(0)}} {}
+    // initialize with bits from val
+    constexpr compact_bitset(unsigned long long val) noexcept : compact_bitset() {
+        // TODO: optomize this -- this may be slower than we would like.
+        for (std::size_t i = 0; val && i < N; ++i, val >>= 1)
+            if (val & 0x1) (*this)[i] = true;
+    }
+    // initialize with a string e.g. "01101011001"
+    template<class CharT, class Traits, class Alloc>
+    explicit compact_bitset(const std::basic_string<CharT,Traits,Alloc>& str,
+                            typename std::basic_string<CharT,Traits,Alloc>::size_type pos = 0,
+                            typename std::basic_string<CharT,Traits,Alloc>::size_type n = std::basic_string<CharT,Traits,Alloc>::npos,
+                            CharT zero = CharT('0'),
+                            CharT one = CharT('1'))
+        : compact_bitset()
+    {
+        if (pos >= str.size()) throw std::out_of_range("Specified string is shorter than pos");
+        std::size_t j = 0;
+        n = std::min(n, str.size());
+        for (auto i = pos; i < n && j < N; ++i, ++j) {
+            const auto ch = str[i];
+            if (Traits::eq(ch, one)) (*this)[j] = true;
+            else if (Traits::eq(ch, zero)) (*this)[j] = false;
+            else throw std::invalid_argument("Encountere a character in the string that is not 'one' or 'zero'");
+        }
+    }
+    template< class CharT >
+    explicit compact_bitset(const CharT* str, typename std::basic_string<CharT>::size_type n = std::basic_string<CharT>::npos,
+                            CharT zero = CharT('0'), CharT one = CharT('1'))
+        : compact_bitset(n == std::basic_string<CharT>::npos ? std::basic_string<CharT>(str) : std::basic_string<CharT>(str, n), 0, n, zero, one) {}
+
     // copy-construct
     constexpr compact_bitset(const compact_bitset &o) noexcept { *this = o; }
 
@@ -104,7 +134,7 @@ public:
     compact_bitset & set(std::size_t pos, bool value = true) { throwIfOutOfRange(pos); (*this)[pos] = value; return *this; }
 
     /// sets all bits to false
-    compact_bitset & reset() noexcept { *this = compact_bitset(); }
+    compact_bitset & reset() noexcept { return *this = compact_bitset(); }
     /// sets the bit at position pos to false
     compact_bitset & reset(std::size_t pos) { throwIfOutOfRange(pos); (*this)[pos] = false; return *this; }
 
@@ -299,10 +329,10 @@ std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits> 
         if (!is.good())
             break;
         CharT ch = is.peek(); // check
-        if (ch != one && ch != zero)
+        if (!Traits::eq(ch, one) && !Traits::eq(ch, zero))
             break;
         is.get(ch); // consume
-        x[i] = ch == one;
+        x[i] = Traits::eq(ch, one);
         ++ok;
     }
     if (N && !ok)

@@ -1,6 +1,7 @@
 #include "compact_bitset.h"
 
 #include <iostream>
+#include <sstream>
 
 template <std::size_t N>
 void test()
@@ -45,6 +46,16 @@ void test()
     } catch (const std::overflow_error &e) {
         std::cout << e.what() << "\n";
     }
+    if (N) {
+        const auto str = cbs.to_string();
+        std::istringstream is(str);
+        compact_bitset<N> parsed(str);
+        if (parsed != cbs) throw std::runtime_error("Parsed value not equal");
+        parsed.reset();
+        if (!parsed.none() || parsed.any()) throw std::runtime_error("Expected reset to clear all bits!");
+        is >> parsed;
+        if (parsed != cbs) throw std::runtime_error("Parsed value not equal (2)");
+    }
 }
 
 int main()
@@ -58,5 +69,19 @@ int main()
     test<100>();
     test<0>();
     test<1>();
+    std::cout << std::string(80, '-') << "\n";
+    {
+        const std::string s = "01010100110";
+        compact_bitset<20> cbs(s);
+        std::cout << "Parse: s: " << s << " -> " << cbs.to_string() << "\n";
+    }
+    std::cout << std::string(80, '-') << "\n";
+    {
+        const std::string s = "01010100110";
+        std::istringstream is(s);
+        compact_bitset<20> cbs;
+        is >> cbs;
+        std::cout << "StramParse: s: " << s << " -> " << cbs.to_string() << "\n";
+    }
     return 0;
 }
