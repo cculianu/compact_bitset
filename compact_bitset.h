@@ -112,14 +112,14 @@ public:
                             CharT one = CharT('1'))
         : compact_bitset()
     {
-        if (pos >= str.size()) throw std::out_of_range("Specified string is shorter than pos");
+        if (pos >= str.size() && N) throw std::out_of_range("Specified string is shorter than pos");
         std::size_t j = 0;
         n = std::min(n, str.size());
         for (auto i = pos; i < n && j < N; ++i, ++j) {
             const auto ch = str[i];
             if (Traits::eq(ch, one)) (*this)[j] = true;
             else if (Traits::eq(ch, zero)) (*this)[j] = false;
-            else throw std::invalid_argument("Encountere a character in the string that is not 'one' or 'zero'");
+            else throw std::invalid_argument("Encountered a character in the string that is not 'one' or 'zero'");
         }
     }
     template< class CharT >
