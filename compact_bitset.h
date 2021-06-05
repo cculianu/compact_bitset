@@ -70,7 +70,7 @@ public:
         /// Implicit conversion to bool for the referenced bit
         constexpr operator bool() const noexcept { return bool(word >> bpos & 0x1); }
         /// Return the inverse of the referenced bit
-        constexpr bool operator~() const noexcept { return ~bool(*this); }
+        constexpr bool operator~() const noexcept { return !bool(*this); }
         /// Flip the referenced bit
         constexpr reference &flip() noexcept { return *this = !bool(*this); }
     };
@@ -202,21 +202,21 @@ public:
         compact_bitset ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < ret.size(); ++i)
             ret[i] = lhs[i] & rhs[i];
-        if constexpr (ret.LastWordMask != 0) ret.data[ret.size()-1] &= ret.LastWordMask; // guarantee 0 for unused bits
+        if constexpr (ret.LastWordMask != 0) ret.data[ret.NWords-1] &= ret.LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     friend inline compact_bitset operator|(const compact_bitset & lhs, const compact_bitset & rhs) noexcept {
         compact_bitset ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < ret.size(); ++i)
             ret[i] = lhs[i] | rhs[i];
-        if constexpr (ret.LastWordMask != 0) ret.data[ret.size()-1] &= ret.LastWordMask; // guarantee 0 for unused bits
+        if constexpr (ret.LastWordMask != 0) ret.data[ret.NWords-1] &= ret.LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     friend inline compact_bitset operator^(const compact_bitset & lhs, const compact_bitset & rhs) noexcept {
         compact_bitset ret(compact_bitset::Uninitialized);
         for (std::size_t i = 0; i < ret.size(); ++i)
             ret[i] = lhs[i] ^ rhs[i];
-        if constexpr (ret.LastWordMask != 0) ret.data[ret.size()-1] &= ret.LastWordMask; // guarantee 0 for unused bits
+        if constexpr (ret.LastWordMask != 0) ret.data[ret.NWords-1] &= ret.LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     compact_bitset & operator&=(const compact_bitset & rhs) noexcept { return *this = *this & rhs; }
@@ -231,7 +231,7 @@ public:
             ret[i] = false;
         for (std::size_t i = 0; i + shift < N; ++i)
             ret[i + shift] = (*this)[i];
-        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask; // guarantee 0 for unused bits
+        if constexpr (LastWordMask != 0) ret.data[NWords-1] &= LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     compact_bitset& operator<<=(std::size_t shift) noexcept { return *this = (*this) << shift; }
@@ -243,7 +243,7 @@ public:
             ret[i] = false;
         for (std::size_t i = 0; i < endpos; ++i)
             ret[i] = (*this)[i + shift];
-        if constexpr (LastWordMask != 0) ret.data[N-1] &= LastWordMask; // guarantee 0 for unused bits
+        if constexpr (LastWordMask != 0) ret.data[NWords-1] &= LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     compact_bitset& operator>>=(std::size_t shift) noexcept { return *this = (*this) >> shift; }
