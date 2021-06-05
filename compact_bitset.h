@@ -96,7 +96,7 @@ private:
     constexpr compact_bitset(const Uninitialized_t &) noexcept {} // uninitialized c'tor
 public:
     // default-construct: all bits are 0
-    constexpr compact_bitset() noexcept : data{{T(0)}} {}
+    constexpr compact_bitset() noexcept : data{{}} {}
     // initialize with bits from val
     constexpr compact_bitset(unsigned long long val) noexcept : compact_bitset() {
         // TODO: optomize this -- this may be slower than we would like.
@@ -198,28 +198,25 @@ public:
 
 
     // -- bitwise operator support
-    template<std::size_t Np, typename Tp>
-    friend compact_bitset<Np, Tp> operator&(const compact_bitset<Np, Tp> & lhs, const compact_bitset<Np, Tp> & rhs) noexcept {
-        compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
-        for (std::size_t i = 0; i < Np; ++i)
+    friend inline compact_bitset operator&(const compact_bitset & lhs, const compact_bitset & rhs) noexcept {
+        compact_bitset ret(compact_bitset::Uninitialized);
+        for (std::size_t i = 0; i < ret.size(); ++i)
             ret[i] = lhs[i] & rhs[i];
-        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask; // guarantee 0 for unused bits
+        if constexpr (ret.LastWordMask != 0) ret.data[ret.size()-1] &= ret.LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
-    template<std::size_t Np, typename Tp>
-    friend compact_bitset<Np, Tp> operator|(const compact_bitset<Np, Tp> & lhs, const compact_bitset<Np, Tp> & rhs) noexcept {
-        compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
-        for (std::size_t i = 0; i < Np; ++i)
+    friend inline compact_bitset operator|(const compact_bitset & lhs, const compact_bitset & rhs) noexcept {
+        compact_bitset ret(compact_bitset::Uninitialized);
+        for (std::size_t i = 0; i < ret.size(); ++i)
             ret[i] = lhs[i] | rhs[i];
-        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask; // guarantee 0 for unused bits
+        if constexpr (ret.LastWordMask != 0) ret.data[ret.size()-1] &= ret.LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
-    template<std::size_t Np, typename Tp>
-    friend compact_bitset<Np, Tp> operator^(const compact_bitset<Np, Tp> & lhs, const compact_bitset<Np, Tp> & rhs) noexcept {
-        compact_bitset<Np, Tp> ret(compact_bitset::Uninitialized);
-        for (std::size_t i = 0; i < Np; ++i)
+    friend inline compact_bitset operator^(const compact_bitset & lhs, const compact_bitset & rhs) noexcept {
+        compact_bitset ret(compact_bitset::Uninitialized);
+        for (std::size_t i = 0; i < ret.size(); ++i)
             ret[i] = lhs[i] ^ rhs[i];
-        if constexpr (LastWordMask != 0) ret.data[Np-1] &= LastWordMask; // guarantee 0 for unused bits
+        if constexpr (ret.LastWordMask != 0) ret.data[ret.size()-1] &= ret.LastWordMask; // guarantee 0 for unused bits
         return ret;
     }
     compact_bitset & operator&=(const compact_bitset & rhs) noexcept { return *this = *this & rhs; }
