@@ -334,7 +334,6 @@ std::size_t compact_bitset<N, T>::count() const noexcept {
 template <std::size_t N, typename T>
 inline
 bool compact_bitset<N, T>::all() const noexcept {
-    // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
     if constexpr (NFullyUsedWords > 0) {
         for (; w < NFullyUsedWords; ++w)
@@ -349,7 +348,6 @@ bool compact_bitset<N, T>::all() const noexcept {
 template <std::size_t N, typename T>
 inline
 bool compact_bitset<N, T>::operator==(const compact_bitset &o) const noexcept {
-    // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
     if constexpr (NFullyUsedWords > 0) {
         for (; w < NFullyUsedWords; ++w)
@@ -364,7 +362,6 @@ bool compact_bitset<N, T>::operator==(const compact_bitset &o) const noexcept {
 template <std::size_t N, typename T>
 inline
 bool compact_bitset<N, T>::any() const noexcept {
-    // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
     if constexpr (NFullyUsedWords > 0) {
         for (; w < NFullyUsedWords; ++w)
@@ -379,7 +376,6 @@ bool compact_bitset<N, T>::any() const noexcept {
 template <std::size_t N, typename T>
 inline
 auto compact_bitset<N, T>::set() noexcept -> compact_bitset & {
-    // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
     if constexpr (NFullyUsedWords > 0) {
         for (; w < NFullyUsedWords; ++w)
@@ -394,7 +390,6 @@ auto compact_bitset<N, T>::set() noexcept -> compact_bitset & {
 template <std::size_t N, typename T>
 inline
 auto compact_bitset<N, T>::flip() noexcept -> compact_bitset & {
-    // kind of optimized but really we should be using intrinsics here
     std::size_t w = 0;
     if constexpr (NFullyUsedWords > 0) {
         for (; w < NFullyUsedWords; ++w)
@@ -421,20 +416,18 @@ template <class CharT, class Traits, std::size_t N, typename T>
 inline
 std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits> & is, compact_bitset<N, T> & x) {
     const CharT one = is.widen('1'), zero = is.widen('0');
-    std::size_t i = 0, ok = 0;
     x.reset();
-    for (; i < N && !is.eof(); ++i) {
+    for (std::size_t i = 0; i < N && !is.eof(); ++i) {
         if (!is.good())
             break;
         CharT ch = is.peek(); // check
-        if (!Traits::eq(ch, one) && !Traits::eq(ch, zero))
+        if (!Traits::eq(ch, one) && !Traits::eq(ch, zero)) {
+            if (!i) is.setstate(std::ios_base::failbit); // could not convert even a single character
             break;
+        }
         is.get(ch); // consume
         x[i] = Traits::eq(ch, one);
-        ++ok;
     }
-    if (N && !ok)
-        is.setstate(std::ios_base::failbit);
     return is;
 }
 
