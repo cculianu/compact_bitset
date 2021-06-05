@@ -106,7 +106,7 @@ private:
         return ret;
     }
     // helper that uses intrinsics to count the number of set bits in a word
-    template <typename Int, std::enable_if_t<std::is_integral_v<Int>, int> = 0>
+    template <typename Int, std::enable_if_t<std::is_integral_v<Int> && sizeof(Int) <= sizeof(unsigned long long), int> = 0>
     static int get_popcount(const Int word) {
 #if defined (__clang__) || defined(__GNUC__)
         using UInt = std::make_unsigned_t<Int>;
@@ -126,7 +126,7 @@ private:
 #endif
     }
     // helper that uses intrinsics to get one-plus the index of the first set bit
-    template <typename Int, std::enable_if_t<std::is_integral_v<Int>, int> = 0>
+    template <typename Int, std::enable_if_t<std::is_integral_v<Int> && sizeof(Int) <= sizeof(unsigned long long), int> = 0>
     static int ffs(const Int word) {
 #if defined (__clang__) || defined(__GNUC__)
         using SInt = std::make_signed_t<Int>;
