@@ -84,12 +84,67 @@ private:
     Int do_int_convert() const noexcept {
         if constexpr (N == 0) return 0;
         Int ret{};
-        constexpr std::size_t IntBytes = sizeof(ret);
-        constexpr std::size_t IntBits = IntBytes * 8;
-        // TODO: optomize; this may be slower than doing some word-at-a-time reading
-        for (std::size_t i = 0; i < IntBits && i < N; ++i)
-            ret |= T(bool((*this)[i])) << i;
+        static constexpr std::size_t IntBits = sizeof(ret) * 8;
+        std::size_t bitOffset = 0;
+        const auto handle_word = [&bitOffset, &ret](auto word) {
+            while (word) {
+                std::size_t bit = std::size_t(ffs(word) - 1);
+                word &= ~(T{0x1} << bit); // clear bit in word so we can keep looping
+                bit += bitOffset; // offset into destination word
+                if (bit >= IntBits)
+                    return;
+                ret |= 0x1 << bit; // set bit
+            }
+        };
+        for (std::size_t w = 0; w < NFullyUsedWords && bitOffset < IntBits; ++w, bitOffset += TBits)
+            handle_word(data[w]);
+        if constexpr (LastWordMask != 0) {
+            // handle last 'partial' word in array
+            if (bitOffset < IntBits)
+                handle_word(data[NWords - 1] & LastWordMask);
+        }
         return ret;
+    }
+    // helper that uses intrinsics to count the number of set bits in a word
+    template <typename Int, std::enable_if_t<std::is_integral_v<Int>, int> = 0>
+    static int get_popcount(const Int word) {
+#if defined (__clang__) || defined(__GNUC__)
+        using UInt = std::make_unsigned_t<Int>;
+        const UInt uword = static_cast<UInt>(word);
+        if constexpr (sizeof(uword) <= sizeof(unsigned int))
+            return __builtin_popcount(static_cast<unsigned int>(uword));
+        else if constexpr (std::is_same_v<UInt, unsigned long>)
+            return __builtin_popcountl(uword);
+        else // unsigned long long
+            return __builtin_popcountll(static_cast<unsigned long long>(uword));
+#else
+        int ret = 0;
+        constexpr std::size_t nBits = sizeof(word) * 8;
+        for (std::size_t i = 0; i < nBits; ++i)
+            if (word & (0x1 << i)) ++ret;
+        return ret;
+#endif
+    }
+    // helper that uses intrinsics to get one-plus the index of the first set bit
+    template <typename Int, std::enable_if_t<std::is_integral_v<Int>, int> = 0>
+    static int ffs(const Int word) {
+#if defined (__clang__) || defined(__GNUC__)
+        using SInt = std::make_signed_t<Int>;
+        const SInt sword = static_cast<SInt>(word);
+        if constexpr (sizeof(sword) <= sizeof(int))
+            return __builtin_ffs(static_cast<int>(sword));
+        else if constexpr (std::is_same_v<SInt, long>)
+            return __builtin_ffsl(sword);
+        else // long long
+            return __builtin_ffsll(static_cast<long long>(sword));
+#else
+        if (word) {
+            constexpr int nBits = sizeof(word) * 8;
+            for (int i = 0; i < nBits; ++i)
+                if (word & (Int(0x1) << i)) return i + 1;
+        }
+        return 0;
+#endif
     }
     struct Uninitialized_t {};
     static constexpr Uninitialized_t Uninitialized{};
@@ -99,9 +154,14 @@ public:
     constexpr compact_bitset() noexcept : data{{}} {}
     // initialize with bits from val
     constexpr compact_bitset(unsigned long long val) noexcept : compact_bitset() {
-        // TODO: optomize this -- this may be slower than we would like.
-        for (std::size_t i = 0; val && i < N; ++i, val >>= 1)
-            if (val & 0x1) (*this)[i] = true;
+        // on gcc & clang the below is hopefully fast as it uses intrinsics
+        while (val) {
+            const auto bit = std::size_t(ffs(val) - 1); // will be in the range [0, 63]
+            if constexpr (sizeof(val) * 8 > N) // this branch is excluded at compile-time for large enough N
+                if (bit >= N) break; // val has bits set that we cannot store, break out of loop
+            (*this)[bit] = true;
+            val &= ~(1ULL << bit); // clear bit
+        }
     }
     // initialize with a string e.g. "01101011001"
     template<class CharT, class Traits, class Alloc>
@@ -265,10 +325,9 @@ public:
 template <std::size_t N, typename T>
 inline
 std::size_t compact_bitset<N, T>::count() const noexcept {
-    std::size_t ret{};
-    // TODO: optimize this to perhaps use intrinsics on some platforms -- this may be slow on some compilers that
-    // fail to optimize the below loop properly
-    for (std::size_t i = 0; i < size(); ++i) ret += bool((*this)[i]);
+    std::size_t ret = 0;
+    for (std::size_t i = 0; i < NFullyUsedWords; ++i) ret += get_popcount(data[i]);
+    if constexpr (LastWordMask != 0) ret += get_popcount(data[NWords-1] & LastWordMask);
     return ret;
 }
 

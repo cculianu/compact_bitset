@@ -34,6 +34,7 @@ void test()
     if (N) cbs2[cbs2.size()-1] = true;
     std::cout << (cbs == cbs2) << "\n";
     std::cout << ~cbs << " (~) \n";
+    std::cout << "Count: " << cbs.count() << " ~Count: " << (~cbs).count() << "\n";
     std::cout << (cbs << 2) << " (<< 2)\n";
     std::cout << (cbs >> 2) << " (>> 2)\n";
     try {
@@ -46,6 +47,7 @@ void test()
     } catch (const std::overflow_error &e) {
         std::cout << e.what() << "\n";
     }
+    std::cout << "123455 -> " << compact_bitset<N>(123455) << " (hash_code: " << compact_bitset<N>(123455).hash_code() << ")\n";
     if (N) {
         const auto str = cbs.to_string();
         std::istringstream is(str);
