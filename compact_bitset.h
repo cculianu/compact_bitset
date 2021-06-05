@@ -93,7 +93,7 @@ private:
                 bit += bitOffset; // offset into destination word
                 if (bit >= IntBits)
                     return;
-                ret |= 0x1 << bit; // set bit
+                ret |= Int(0x1) << bit; // set bit
             }
         };
         for (std::size_t w = 0; w < NFullyUsedWords && bitOffset < IntBits; ++w, bitOffset += TBits)
@@ -121,7 +121,7 @@ private:
         int ret = 0;
         constexpr std::size_t nBits = sizeof(word) * 8;
         for (std::size_t i = 0; i < nBits; ++i)
-            if (word & (0x1 << i)) ++ret;
+            if (word & (Int(0x1) << i)) ++ret;
         return ret;
 #endif
     }
