@@ -60,7 +60,7 @@ public:
     class reference {
         friend class compact_bitset<N, T>;
         T & word; ///< reference into the data array above
-        std::size_t bpos; ///< bitpos of the bit in question in the word reference above
+        const std::size_t bpos; ///< bitpos of the bit in question in the word reference above
         constexpr reference(T & w, std::size_t p) noexcept : word(w), bpos(p) {}
     public:
         /// Assign a boolean to the referenced bit
@@ -106,45 +106,49 @@ private:
         return ret;
     }
     // helper that uses intrinsics to count the number of set bits in a word
-    template <typename Int, std::enable_if_t<std::is_integral_v<Int> && sizeof(Int) <= sizeof(unsigned long long), int> = 0>
+    template <typename Int, std::enable_if_t<std::is_integral_v<Int>, int> = 0>
     static int get_popcount(const Int word) {
-#if defined (__clang__) || defined(__GNUC__)
-        using UInt = std::make_unsigned_t<Int>;
-        const UInt uword = static_cast<UInt>(word);
-        if constexpr (sizeof(uword) <= sizeof(unsigned int))
-            return __builtin_popcount(static_cast<unsigned int>(uword));
-        else if constexpr (std::is_same_v<UInt, unsigned long>)
-            return __builtin_popcountl(uword);
-        else // unsigned long long
-            return __builtin_popcountll(static_cast<unsigned long long>(uword));
-#else
+#if defined(__clang__) || defined(__GNUC__)
+        if constexpr (sizeof(Int) <= sizeof(unsigned long long)) {
+            using UInt = std::make_unsigned_t<Int>;
+            const UInt uword = static_cast<UInt>(word);
+            if constexpr (sizeof(uword) <= sizeof(unsigned int))
+                return __builtin_popcount(static_cast<unsigned int>(uword));
+            else if constexpr (std::is_same_v<UInt, unsigned long>)
+                return __builtin_popcountl(uword);
+            else // unsigned long long
+                return __builtin_popcountll(static_cast<unsigned long long>(uword));
+        }
+#endif
+        // fall back to slow method if no builtin_popcount or if operating on __int128_t
         int ret = 0;
         constexpr std::size_t nBits = sizeof(word) * 8;
         for (std::size_t i = 0; i < nBits; ++i)
             if (word & (Int(0x1) << i)) ++ret;
         return ret;
-#endif
     }
     // helper that uses intrinsics to get one-plus the index of the first set bit
-    template <typename Int, std::enable_if_t<std::is_integral_v<Int> && sizeof(Int) <= sizeof(unsigned long long), int> = 0>
+    template <typename Int, std::enable_if_t<std::is_integral_v<Int>, int> = 0>
     static int ffs(const Int word) {
-#if defined (__clang__) || defined(__GNUC__)
-        using SInt = std::make_signed_t<Int>;
-        const SInt sword = static_cast<SInt>(word);
-        if constexpr (sizeof(sword) <= sizeof(int))
-            return __builtin_ffs(static_cast<int>(sword));
-        else if constexpr (std::is_same_v<SInt, long>)
-            return __builtin_ffsl(sword);
-        else // long long
-            return __builtin_ffsll(static_cast<long long>(sword));
-#else
+#if defined(__clang__) || defined(__GNUC__)
+        if constexpr (sizeof(Int) <= sizeof(unsigned long long)) {
+            using SInt = std::make_signed_t<Int>;
+            const SInt sword = static_cast<SInt>(word);
+            if constexpr (sizeof(sword) <= sizeof(int))
+                return __builtin_ffs(static_cast<int>(sword));
+            else if constexpr (std::is_same_v<SInt, long>)
+                return __builtin_ffsl(sword);
+            else // long long
+                return __builtin_ffsll(static_cast<long long>(sword));
+        }
+#endif
+        // fall back to slow method if no builtin_ffs or if operating on __int128_t
         if (word) {
             constexpr int nBits = sizeof(word) * 8;
             for (int i = 0; i < nBits; ++i)
                 if (word & (Int(0x1) << i)) return i + 1;
         }
         return 0;
-#endif
     }
     struct Uninitialized_t {};
     static constexpr Uninitialized_t Uninitialized{};
